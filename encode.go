@@ -642,6 +642,15 @@ func isValidNumber(s string) bool {
 		return false
 	}
 
+	switch s {
+	case "Infinity":
+		return true
+	case "-Infinity":
+		return true
+	case "NaN":
+		return true
+	}
+
 	// Optional -
 	if s[0] == '-' {
 		s = s[1:]
