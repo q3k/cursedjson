@@ -11,6 +11,7 @@ import (
 	"encoding"
 	"encoding/base64"
 	"fmt"
+	"math"
 	"reflect"
 	"strconv"
 	"strings"
@@ -326,6 +327,9 @@ Switch:
 	case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '-': // number
 		for ; i < len(data); i++ {
 			switch data[i] {
+			case 'I': // Infinity
+				i += len("Infinity")
+				break Switch
 			case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
 				'.', 'e', 'E', '+', '-':
 			default:
@@ -338,6 +342,10 @@ Switch:
 		i += len("alse")
 	case 'n': // null
 		i += len("ull")
+	case 'N': // NaN
+		i += len("aN")
+	case 'I': // Infinity
+		i += len("nfinity")
 	}
 	if i < len(data) {
 		d.opcode = stateEndValue(&d.scan, data[i])
@@ -871,6 +879,10 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 				val = "null"
 			case 't', 'f':
 				val = "bool"
+			case 'N':
+				val = "NaN"
+			case 'I':
+				val = "Infinity"
 			}
 			d.saveError(&UnmarshalTypeError{Value: val, Type: v.Type(), Offset: int64(d.readIndex())})
 			return nil
@@ -962,7 +974,7 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 		}
 
 	default: // number
-		if c != '-' && (c < '0' || c > '9') {
+		if c != '-' && (c < '0' || c > '9') && c != 'I' && c != 'N' {
 			if fromQuoted {
 				return fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into %v", item, v.Type())
 			}
@@ -1010,12 +1022,22 @@ func (d *decodeState) literalStore(item []byte, v reflect.Value, fromQuoted bool
 			v.SetUint(n)
 
 		case reflect.Float32, reflect.Float64:
-			n, err := strconv.ParseFloat(s, v.Type().Bits())
-			if err != nil || v.OverflowFloat(n) {
-				d.saveError(&UnmarshalTypeError{Value: "number " + s, Type: v.Type(), Offset: int64(d.readIndex())})
-				break
+			// Short circuit special cases.
+			switch s {
+			case "Infinity":
+				v.SetFloat(math.Inf(1))
+			case "-Infinity":
+				v.SetFloat(math.Inf(-1))
+			case "NaN":
+				v.SetFloat(math.NaN())
+			default:
+				n, err := strconv.ParseFloat(s, v.Type().Bits())
+				if err != nil || v.OverflowFloat(n) {
+					d.saveError(&UnmarshalTypeError{Value: "number " + s, Type: v.Type(), Offset: int64(d.readIndex())})
+					break
+				}
+				v.SetFloat(n)
 			}
-			v.SetFloat(n)
 		}
 	}
 	return nil

@@ -393,6 +393,7 @@ type unmarshalTest struct {
 	out                   interface{}
 	err                   error
 	useNumber             bool
+	useVerifyFunc         bool // out is func(v interface{}) bool
 	golden                bool
 	disallowUnknownFields bool
 }
@@ -430,6 +431,11 @@ var unmarshalTests = []unmarshalTest{
 	{in: `{"F1":1,"F2":2,"F3":3}`, ptr: new(V), out: V{F1: Number("1"), F2: int32(2), F3: Number("3")}, useNumber: true},
 	{in: `{"k1":1,"k2":"s","k3":[1,2.0,3e-3],"k4":{"kk1":"s","kk2":2}}`, ptr: new(interface{}), out: ifaceNumAsFloat64},
 	{in: `{"k1":1,"k2":"s","k3":[1,2.0,3e-3],"k4":{"kk1":"s","kk2":2}}`, ptr: new(interface{}), out: ifaceNumAsNumber, useNumber: true},
+
+	// cursed types from python's json package
+	{in: `Infinity`, ptr: new(float64), out: math.Inf(1)},
+	{in: `-Infinity`, ptr: new(float64), out: math.Inf(-1)},
+	{in: `NaN`, ptr: new(float64), useVerifyFunc: true, out: func(v interface{}) bool { return math.IsNaN(v.(float64)) }},
 
 	// raw values with whitespace
 	{in: "\n true ", ptr: new(bool), out: true},
@@ -1136,13 +1142,22 @@ func TestUnmarshal(t *testing.T) {
 		} else if err != nil {
 			continue
 		}
-		if !reflect.DeepEqual(v.Elem().Interface(), tt.out) {
-			t.Errorf("#%d: mismatch\nhave: %#+v\nwant: %#+v", i, v.Elem().Interface(), tt.out)
-			data, _ := Marshal(v.Elem().Interface())
-			println(string(data))
-			data, _ = Marshal(tt.out)
-			println(string(data))
-			continue
+
+		if tt.useVerifyFunc {
+			vf := tt.out.(func(v interface{}) bool)
+			if !vf(v.Elem().Interface()) {
+				t.Errorf("#%d: verify func failed", i)
+				continue
+			}
+		} else {
+			if !reflect.DeepEqual(v.Elem().Interface(), tt.out) {
+				t.Errorf("#%d: mismatch\nhave: %#+v\nwant: %#+v", i, v.Elem().Interface(), tt.out)
+				data, _ := Marshal(v.Elem().Interface())
+				println(string(data))
+				data, _ = Marshal(tt.out)
+				println(string(data))
+				continue
+			}
 		}
 
 		// Check round trip also decodes correctly.
@@ -1164,7 +1179,9 @@ func TestUnmarshal(t *testing.T) {
 				t.Errorf("#%d: error re-unmarshaling %#q: %v", i, enc, err)
 				continue
 			}
-			if !reflect.DeepEqual(v.Elem().Interface(), vv.Elem().Interface()) {
+			// We bypass the reflection equality on useVerifyFunc, which is currently used on NaNs
+			// TODO(q3k): fix this hack
+			if !reflect.DeepEqual(v.Elem().Interface(), vv.Elem().Interface()) && !tt.useVerifyFunc {
 				t.Errorf("#%d: mismatch\nhave: %#+v\nwant: %#+v", i, v.Elem().Interface(), vv.Elem().Interface())
 				t.Errorf("     In: %q", strings.Map(noSpace, string(in)))
 				t.Errorf("Marshal: %q", strings.Map(noSpace, string(enc)))

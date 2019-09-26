@@ -201,8 +201,13 @@ func stateBeginValue(s *scanner, c byte) int {
 	case 'f': // beginning of false
 		s.step = stateF
 		return scanBeginLiteral
-	case 'n': // beginning of null
+	case 'N':
+		fallthrough
+	case 'n': // beginning of null or nan
 		s.step = stateN
+		return scanBeginLiteral
+	case 'I': // beginning of Infinity
+		s.step = stateI
 		return scanBeginLiteral
 	}
 	if '1' <= c && c <= '9' { // beginning of 1234.5
@@ -375,6 +380,10 @@ func stateNeg(s *scanner, c byte) int {
 		s.step = state1
 		return scanContinue
 	}
+	if c == 'I' {
+		s.step = stateI
+		return scanContinue
+	}
 	return s.error(c, "in numeric literal")
 }
 
@@ -386,6 +395,62 @@ func state1(s *scanner, c byte) int {
 		return scanContinue
 	}
 	return state0(s, c)
+}
+
+func stateI(s *scanner, c byte) int {
+	if c == 'n' {
+		s.step = stateIn
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'n')")
+}
+
+func stateIn(s *scanner, c byte) int {
+	if c == 'f' {
+		s.step = stateInf
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'f')")
+}
+
+func stateInf(s *scanner, c byte) int {
+	if c == 'i' {
+		s.step = stateInfi
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'i')")
+}
+
+func stateInfi(s *scanner, c byte) int {
+	if c == 'n' {
+		s.step = stateInfin
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'n')")
+}
+
+func stateInfin(s *scanner, c byte) int {
+	if c == 'i' {
+		s.step = stateInfini
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'i')")
+}
+
+func stateInfini(s *scanner, c byte) int {
+	if c == 't' {
+		s.step = stateInfinit
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 't')")
+}
+
+func stateInfinit(s *scanner, c byte) int {
+	if c == 'y' {
+		s.step = stateEndValue
+		return scanContinue
+	}
+	return s.error(c, "in literal infinity (expecting 'y')")
 }
 
 // state0 is the state after reading `0` during a number.
@@ -523,7 +588,19 @@ func stateN(s *scanner, c byte) int {
 		s.step = stateNu
 		return scanContinue
 	}
-	return s.error(c, "in literal null (expecting 'u')")
+	if c == 'a' {
+		s.step = stateNa
+		return scanContinue
+	}
+	return s.error(c, "in literal null/nan (expecting 'u' or 'a')")
+}
+
+func stateNa(s *scanner, c byte) int {
+	if c == 'N' {
+		s.step = stateEndValue
+		return scanContinue
+	}
+	return s.error(c, "in listeral nan (expecting 'n')")
 }
 
 // stateNu is the state after reading `nu`.
