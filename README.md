@@ -5,7 +5,7 @@ cursedjson
 
 A drop-in replacement for `encoding/json` when you absolutely, positively need to decode JSON files that contain Infinity, -Infinity and NaN.
 
-This is useful for when you're interfacing with a brain dead system that uses `jon.dump()` in Python without setting `allow_nan=False`. Because by default, it will be non-compliant with the JSON RFC that Go follows.
+This is useful for when you're interfacing with a brain dead system that uses `json.dump()` in Python without setting `allow_nan=False`. Because by default, it will be non-compliant with the JSON RFC that Go follows.
 
 Fuck JSON, by the way.
 
