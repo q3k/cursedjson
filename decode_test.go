@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package json
+package cursedjson
 
 import (
 	"bytes"
@@ -973,7 +973,7 @@ var unmarshalTests = []unmarshalTest{
 		ptr: new(struct {
 			A Number `json:",string"`
 		}),
-		err: fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into json.Number", `invalid`),
+		err: fmt.Errorf("json: invalid use of ,string struct tag, trying to unmarshal %q into cursedjson.Number", `invalid`),
 	},
 	{
 		in:  `{"A":"invalid"}`,
@@ -2284,7 +2284,7 @@ func TestUnmarshalEmbeddedUnexported(t *testing.T) {
 		in:  `{"R":2,"Q":1}`,
 		ptr: new(S1),
 		out: &S1{R: 2},
-		err: fmt.Errorf("json: cannot set embedded pointer to unexported struct: json.embed1"),
+		err: fmt.Errorf("json: cannot set embedded pointer to unexported struct: cursedjson.embed1"),
 	}, {
 		// The top level Q field takes precedence.
 		in:  `{"Q":1}`,
@@ -2306,7 +2306,7 @@ func TestUnmarshalEmbeddedUnexported(t *testing.T) {
 		in:  `{"R":2,"Q":1}`,
 		ptr: new(S5),
 		out: &S5{R: 2},
-		err: fmt.Errorf("json: cannot set embedded pointer to unexported struct: json.embed3"),
+		err: fmt.Errorf("json: cannot set embedded pointer to unexported struct: cursedjson.embed3"),
 	}, {
 		// Issue 24152, ensure decodeState.indirect does not panic.
 		in:  `{"embed1": {"Q": 1}}`,
